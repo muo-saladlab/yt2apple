@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yt2apple"
+version = "0.1.0"
+description = "Convert YouTube playlists to Apple Music playlists"
+requires-python = ">=3.11"
+dependencies = [
+    "yt-dlp>=2024.1.0",
+    "requests>=2.31.0",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+yt2apple = "yt2apple.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
