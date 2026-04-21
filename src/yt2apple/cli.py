@@ -51,6 +51,7 @@ def convert(url: str, name: str | None, storefront: str) -> None:
 
     matched: list[str] = []
     unmatched: list[str] = []
+    uncertain_count = 0
 
     with Progress(
         SpinnerColumn(),
@@ -65,11 +66,15 @@ def convert(url: str, name: str | None, storefront: str) -> None:
             song_id = search_song(track.title, track.artist, dev_token, user_token, storefront)
             if song_id:
                 matched.append(song_id)
+                if track.uncertain:
+                    uncertain_count += 1
             else:
                 unmatched.append(track.raw or track.search_query())
             progress.advance(task)
 
     console.print(f"\n[green]✓ Matched:[/green] {len(matched)} / {len(tracks)} songs")
+    if uncertain_count:
+        console.print(f"[yellow]  ↳ {uncertain_count} matched by title only (no artist info — may be wrong version)[/yellow]")
 
     if not matched:
         console.print("[red]No songs matched. Playlist not created.[/red]")

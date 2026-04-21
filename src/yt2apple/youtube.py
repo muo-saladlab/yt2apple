@@ -11,6 +11,7 @@ class Track:
     title: str
     artist: str | None = None
     raw: str = ""
+    uncertain: bool = False  # True when artist info unavailable (e.g. chapter-only)
 
     def search_query(self) -> str:
         if self.artist:
@@ -178,7 +179,12 @@ def extract_tracks(url: str) -> tuple[str, list[Track]]:
             if _is_compilation_title(title):
                 compilations_skipped += 1
                 continue
-            tracks.append(_parse_title(title))
+            track = _parse_title(title)
+            if not track.artist:
+                uploader = unicodedata.normalize('NFKC', entry.get("uploader") or entry.get("channel") or "")
+                if uploader:
+                    track = Track(title=track.title, artist=uploader, raw=track.raw)
+            tracks.append(track)
         if compilations_skipped:
             print(f"[skipped {compilations_skipped} compilation/mix videos]", file=sys.stderr)
         return playlist_name, tracks
@@ -189,7 +195,13 @@ def extract_tracks(url: str) -> tuple[str, list[Track]]:
     # Priority 1: YouTube chapter metadata (most reliable)
     chapters = info.get("chapters") or []
     if len(chapters) > 1:  # >1 because single-song videos can have 1 chapter = the whole video
-        tracks = [_parse_title(ch["title"]) for ch in chapters if ch.get("title")]
+        tracks = []
+        for ch in chapters:
+            if ch.get("title"):
+                t = _parse_title(ch["title"])
+                if not t.artist:
+                    t = Track(title=t.title, artist=t.artist, raw=t.raw, uncertain=True)
+                tracks.append(t)
         return video_title, tracks
 
     # Priority 2: Description timestamp parsing
