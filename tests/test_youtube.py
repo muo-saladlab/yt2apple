@@ -1,6 +1,6 @@
 """Unit tests for youtube.py — no network calls, pure parsing logic."""
 
-from yt2apple.youtube import Track, _parse_title, _parse_description_tracks
+from yt2apple.youtube import Track, _parse_title, _parse_description_tracks, _is_compilation_title
 
 
 # ---------------------------------------------------------------------------
@@ -110,3 +110,19 @@ def test_search_query_with_artist():
 def test_search_query_no_artist():
     t = Track(title="Bohemian Rhapsody")
     assert t.search_query() == "Bohemian Rhapsody"
+
+
+# ---------------------------------------------------------------------------
+# Bug fixes
+# ---------------------------------------------------------------------------
+
+def test_unicode_normalization():
+    # Mathematical Bold letters/digits should normalize to ASCII equivalents
+    track = _parse_title("𝐁𝐆𝐌 𝟑𝟎𝐌")
+    assert track.title == "BGM 30M"
+    assert track.artist is None
+
+
+def test_compilation_filter():
+    assert _is_compilation_title("1시간 피아노 모음") is True
+    assert _is_compilation_title("아이유 - 밤편지") is False

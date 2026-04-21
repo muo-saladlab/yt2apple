@@ -1,4 +1,6 @@
 import re
+import sys
+import unicodedata
 from dataclasses import dataclass
 
 import yt_dlp
@@ -47,6 +49,23 @@ _TIMESTAMP_LINE = re.compile(
     r"^(?:[\-\*\•]?\s*\d+[\.\)]\s*|\d+:\d+(?::\d+)?\s+)(.*\S)"
 )
 
+# Compilation/mix video detection (after NFKC normalization)
+_COMPILATION_PATTERNS = re.compile(
+    r"(?:"
+    r"\d+\s*시간"            # "1시간", "2시간" (Korean: X hours)
+    r"|\d+\s*hour"           # "1 hour", "2 hours"
+    r"|\d+\s*min(?:utes?)?"  # "30 min", "60 minutes"
+    r"|playlist"
+    r"|모음"                 # Korean: collection
+    r"|노동요"               # Korean: work song (meme compilation)
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _is_compilation_title(title: str) -> bool:
+    return bool(_COMPILATION_PATTERNS.search(title))
+
 
 def _strip_suffixes(text: str) -> str:
     return _SUFFIX_PATTERN.sub("", text).strip()
@@ -64,6 +83,7 @@ def _normalise_artist(artist: str) -> str:
 
 def _parse_title(raw: str) -> Track:
     """Parse a raw video title string into a Track."""
+    raw = unicodedata.normalize('NFKC', raw)
     cleaned = _strip_suffixes(raw)
 
     # Try "Artist - Title"
@@ -88,7 +108,7 @@ def _parse_description_tracks(description: str) -> list[Track]:
     """Extract tracks from a video description that contains timestamps or a numbered list."""
     tracks: list[Track] = []
     for line in description.splitlines():
-        line = line.strip()
+        line = unicodedata.normalize('NFKC', line.strip())
         if not line:
             continue
 
@@ -121,14 +141,26 @@ def extract_tracks(url: str) -> tuple[str, list[Track]]:
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
+    # Detect YouTube Mix/Radio (auto-generated, may contain non-music content)
+    is_mix = "list=RD" in url or info.get("playlist_id", "").startswith("RD")
+    if is_mix:
+        print("Warning: YouTube Mix/Radio detected. Results may include non-music content.", file=sys.stderr)
+
     # Playlist
     if info.get("_type") == "playlist" or "entries" in info:
         playlist_name: str = info.get("title") or "Unknown Playlist"
         tracks: list[Track] = []
+        compilations_skipped = 0
         for entry in info.get("entries") or []:
-            title = entry.get("title") or ""
-            if title:
-                tracks.append(_parse_title(title))
+            title = unicodedata.normalize('NFKC', entry.get("title") or "")
+            if not title:
+                continue
+            if _is_compilation_title(title):
+                compilations_skipped += 1
+                continue
+            tracks.append(_parse_title(title))
+        if compilations_skipped:
+            print(f"[skipped {compilations_skipped} compilation/mix videos]", file=sys.stderr)
         return playlist_name, tracks
 
     # Single video
