@@ -136,7 +136,12 @@ def test_compilation_filter():
 
 def test_extract_tracks_uses_chapters():
     """Single video with chapters should use chapter titles, not description."""
-    fake_info = {
+    first_call_info = {
+        "title": "Best of 2024 Compilation",
+        "webpage_url": "https://www.youtube.com/watch?v=TEST",
+        # no _type, no entries — signals single video
+    }
+    second_call_info = {
         "title": "Best of 2024 Compilation",
         "description": "",
         "chapters": [
@@ -148,7 +153,7 @@ def test_extract_tracks_uses_chapters():
     mock_ydl = MagicMock()
     mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
     mock_ydl.__exit__ = MagicMock(return_value=False)
-    mock_ydl.extract_info = MagicMock(return_value=fake_info)
+    mock_ydl.extract_info = MagicMock(side_effect=[first_call_info, second_call_info])
 
     with patch("yt_dlp.YoutubeDL", return_value=mock_ydl):
         video_title, tracks = extract_tracks("https://www.youtube.com/watch?v=TEST")

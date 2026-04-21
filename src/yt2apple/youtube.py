@@ -131,15 +131,28 @@ def extract_tracks(url: str) -> tuple[str, list[Track]]:
     For single videos: description timestamps parsed for song list.
     If description has no timestamps, falls back to video title as single Track.
     """
-    ydl_opts = {
+    flat_opts = {
         "quiet": True,
         "no_warnings": True,
         "extract_flat": True,
         "skip_download": True,
     }
+    full_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        # no extract_flat — needed to get chapters
+    }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(flat_opts) as ydl:
         info = ydl.extract_info(url, download=False)
+
+    is_playlist = info.get("_type") == "playlist" or "entries" in info
+
+    if not is_playlist:
+        # Re-fetch single video with full metadata to get chapters
+        with yt_dlp.YoutubeDL(full_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
     # Detect YouTube Mix/Radio (auto-generated, may contain non-music content)
     is_mix = "list=RD" in url or info.get("playlist_id", "").startswith("RD")
