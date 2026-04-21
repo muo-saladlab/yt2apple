@@ -6,15 +6,12 @@ DEV_TOKEN = "dev_token"
 USER_TOKEN = "user_token"
 
 
-def _make_search_response(song_ids: list[str]) -> MagicMock:
+def _make_search_response(track_ids: list[int]) -> MagicMock:
     resp = MagicMock()
     resp.status_code = 200
     resp.json.return_value = {
-        "results": {
-            "songs": {
-                "data": [{"id": sid} for sid in song_ids]
-            }
-        }
+        "resultCount": len(track_ids),
+        "results": [{"trackId": tid, "trackName": "Song", "artistName": "Artist"} for tid in track_ids],
     }
     return resp
 
@@ -22,7 +19,7 @@ def _make_search_response(song_ids: list[str]) -> MagicMock:
 def _make_empty_search_response() -> MagicMock:
     resp = MagicMock()
     resp.status_code = 200
-    resp.json.return_value = {"results": {"songs": {"data": []}}}
+    resp.json.return_value = {"resultCount": 0, "results": []}
     return resp
 
 
@@ -30,11 +27,11 @@ class TestSearchSong:
     def test_search_song_with_artist(self):
         """artist+title query returns song id."""
         with patch("yt2apple.apple_music.requests.get") as mock_get:
-            mock_get.return_value = _make_search_response(["123"])
+            mock_get.return_value = _make_search_response([123456789])
 
             result = search_song("Bohemian Rhapsody", "Queen", DEV_TOKEN, USER_TOKEN)
 
-        assert result == "123"
+        assert result == "123456789"
         # Should have been called once (artist+title succeeded on first try)
         mock_get.assert_called_once()
         call_params = mock_get.call_args[1]["params"]
@@ -45,12 +42,12 @@ class TestSearchSong:
         with patch("yt2apple.apple_music.requests.get") as mock_get:
             mock_get.side_effect = [
                 _make_empty_search_response(),
-                _make_search_response(["456"]),
+                _make_search_response([456789012]),
             ]
 
             result = search_song("Bohemian Rhapsody", "Queen", DEV_TOKEN, USER_TOKEN)
 
-        assert result == "456"
+        assert result == "456789012"
         assert mock_get.call_count == 2
         # Second call should use title only
         second_params = mock_get.call_args_list[1][1]["params"]

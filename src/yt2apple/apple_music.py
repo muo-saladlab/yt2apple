@@ -104,20 +104,16 @@ def _auth_headers(developer_token: str, user_token: str) -> dict:
 def search_song(
     title: str,
     artist: str | None,
-    developer_token: str,
-    user_token: str,
+    developer_token: str,  # kept for API compatibility, unused now
+    user_token: str,        # kept for API compatibility, unused now
     storefront: str = "kr",
 ) -> str | None:
     """
-    Search Apple Music catalog for a song.
+    Search iTunes Store API for a song. No auth required.
     Returns catalog song ID (string) or None if not found.
-
-    Strategy:
-    1. Try "artist title" query (if artist provided)
-    2. Fall back to "title" only query
     """
-    headers = _auth_headers(developer_token, user_token)
-    base_url = f"https://amp-api.music.apple.com/v1/catalog/{storefront}/search"
+    country = storefront
+    base_url = "https://itunes.apple.com/search"
 
     queries = []
     if artist:
@@ -128,16 +124,14 @@ def search_song(
         try:
             resp = requests.get(
                 base_url,
-                headers=headers,
-                params={"term": query, "types": "songs", "limit": 5},
+                params={"term": query, "media": "music", "entity": "song", "country": country, "limit": 5},
                 timeout=10,
             )
             if resp.status_code != 200:
                 continue
-            data = resp.json()
-            songs = data.get("results", {}).get("songs", {}).get("data", [])
-            if songs:
-                return songs[0]["id"]
+            results = resp.json().get("results", [])
+            if results:
+                return str(results[0]["trackId"])
         except requests.RequestException:
             continue
 
