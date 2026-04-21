@@ -172,10 +172,18 @@ def extract_tracks(url: str) -> tuple[str, list[Track]]:
 
     # Single video
     video_title: str = info.get("title") or "Unknown"
+
+    # Priority 1: YouTube chapter metadata (most reliable)
+    chapters = info.get("chapters") or []
+    if len(chapters) > 1:  # >1 because single-song videos can have 1 chapter = the whole video
+        tracks = [_parse_title(ch["title"]) for ch in chapters if ch.get("title")]
+        return video_title, tracks
+
+    # Priority 2: Description timestamp parsing
     description: str = info.get("description") or ""
     tracks = _parse_description_tracks(description)
     if tracks:
         return video_title, tracks
 
-    # Fallback: treat the video title itself as the single track
+    # Priority 3: Fallback — video title itself
     return video_title, [_parse_title(video_title)]

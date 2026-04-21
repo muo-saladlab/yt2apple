@@ -134,6 +134,33 @@ def test_compilation_filter():
 # Deduplication
 # ---------------------------------------------------------------------------
 
+def test_extract_tracks_uses_chapters():
+    """Single video with chapters should use chapter titles, not description."""
+    fake_info = {
+        "title": "Best of 2024 Compilation",
+        "description": "",
+        "chapters": [
+            {"start_time": 0, "title": "Bust the Dust"},
+            {"start_time": 213, "title": "Memories - Artist"},
+        ],
+    }
+
+    mock_ydl = MagicMock()
+    mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+    mock_ydl.__exit__ = MagicMock(return_value=False)
+    mock_ydl.extract_info = MagicMock(return_value=fake_info)
+
+    with patch("yt_dlp.YoutubeDL", return_value=mock_ydl):
+        video_title, tracks = extract_tracks("https://www.youtube.com/watch?v=TEST")
+
+    assert video_title == "Best of 2024 Compilation"
+    assert len(tracks) == 2
+    assert tracks[0].title == "Bust the Dust"
+    assert tracks[0].artist is None
+    assert tracks[1].title == "Artist"
+    assert tracks[1].artist == "Memories"
+
+
 def test_deduplicate_playlist_entries():
     """Duplicate video IDs in a playlist should appear only once in results."""
     entries = [
