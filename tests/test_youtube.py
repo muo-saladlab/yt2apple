@@ -1,6 +1,8 @@
 """Unit tests for youtube.py — no network calls, pure parsing logic."""
 
-from yt2apple.youtube import Track, _parse_title, _parse_description_tracks, _is_compilation_title
+from unittest.mock import patch, MagicMock
+
+from yt2apple.youtube import Track, _parse_title, _parse_description_tracks, _is_compilation_title, extract_tracks
 
 
 # ---------------------------------------------------------------------------
@@ -126,3 +128,38 @@ def test_unicode_normalization():
 def test_compilation_filter():
     assert _is_compilation_title("1시간 피아노 모음") is True
     assert _is_compilation_title("아이유 - 밤편지") is False
+
+
+# ---------------------------------------------------------------------------
+# Deduplication
+# ---------------------------------------------------------------------------
+
+def test_deduplicate_playlist_entries():
+    """Duplicate video IDs in a playlist should appear only once in results."""
+    entries = [
+        {"id": "vid1", "title": "아이유 - 밤편지"},
+        {"id": "vid2", "title": "BTS - Butter"},
+        {"id": "vid1", "title": "아이유 - 밤편지"},   # duplicate
+        {"id": "vid3", "title": "NewJeans - Hype Boy"},
+        {"id": "vid2", "title": "BTS - Butter"},       # duplicate
+    ]
+    fake_info = {
+        "_type": "playlist",
+        "title": "Test Playlist",
+        "entries": entries,
+    }
+
+    mock_ydl = MagicMock()
+    mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+    mock_ydl.__exit__ = MagicMock(return_value=False)
+    mock_ydl.extract_info = MagicMock(return_value=fake_info)
+
+    with patch("yt_dlp.YoutubeDL", return_value=mock_ydl):
+        playlist_name, tracks = extract_tracks("https://www.youtube.com/playlist?list=TEST")
+
+    assert playlist_name == "Test Playlist"
+    assert len(tracks) == 3
+    titles = [t.title for t in tracks]
+    assert titles.count("밤편지") == 1
+    assert titles.count("Butter") == 1
+    assert titles.count("Hype Boy") == 1

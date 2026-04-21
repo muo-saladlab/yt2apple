@@ -151,7 +151,14 @@ def extract_tracks(url: str) -> tuple[str, list[Track]]:
         playlist_name: str = info.get("title") or "Unknown Playlist"
         tracks: list[Track] = []
         compilations_skipped = 0
+        seen_ids: set[str] = set()
         for entry in info.get("entries") or []:
+            video_id = entry.get("id") or entry.get("url") or ""
+            if video_id and video_id in seen_ids:
+                continue
+            if video_id:
+                seen_ids.add(video_id)
+
             title = unicodedata.normalize('NFKC', entry.get("title") or "")
             if not title:
                 continue
